@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Iterator;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class Main {
+
+    private static Map<String, Integer> fieldCount = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         // Path to your JSON file
@@ -19,32 +21,43 @@ public class Main {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode rootNode = objectMapper.readTree(jsonFile);
 
-        // Define the UUID pattern
-        Pattern uuidPattern = Pattern.compile("^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$");
+        // Search for specific field names (id, containerId)
+        searchForFieldNames(rootNode, "", new String[]{"id", "containerId", "_id"});
 
-        // Search for UUIDs
-        searchForUUIDs(rootNode, "", uuidPattern);
+        // Print counts for field names
+        printFieldCounts();
     }
 
-    private static void searchForUUIDs(JsonNode node, String currentPath, Pattern uuidPattern) {
+    private static void searchForFieldNames(JsonNode node, String currentPath, String[] fieldNamesToFind) {
         if (node.isObject()) {
             Iterator<String> fieldNames = node.fieldNames();
             while (fieldNames.hasNext()) {
                 String fieldName = fieldNames.next();
                 JsonNode childNode = node.get(fieldName);
-                searchForUUIDs(childNode, currentPath.isEmpty() ? fieldName : currentPath + "." + fieldName, uuidPattern);
+
+                // Check if the current field name is one of the fields we're looking for
+                for (String fieldNameToFind : fieldNamesToFind) {
+                    if (fieldName.equals(fieldNameToFind)) {
+                        // If found, increment count and print the path
+                        fieldCount.put(fieldName, fieldCount.getOrDefault(fieldName, 0) + 1);
+                        System.out.println("Found field: " + fieldName + " at path: " + currentPath + "." + fieldName);
+                    }
+                }
+
+                // Continue to traverse the child node
+                searchForFieldNames(childNode, currentPath.isEmpty() ? fieldName : currentPath + "." + fieldName, fieldNamesToFind);
             }
         } else if (node.isArray()) {
             for (int i = 0; i < node.size(); i++) {
-                searchForUUIDs(node.get(i), currentPath + "[" + i + "]", uuidPattern);
-            }
-        } else if (node.isValueNode()) {
-            String value = node.asText();
-            Matcher matcher = uuidPattern.matcher(value);
-            if (matcher.matches()) {
-                System.out.println("Found UUID: " + value + " at path: " + currentPath);
+                searchForFieldNames(node.get(i), currentPath + "[" + i + "]", fieldNamesToFind);
             }
         }
     }
 
+    private static void printFieldCounts() {
+        System.out.println("\nField counts:");
+        for (Map.Entry<String, Integer> entry : fieldCount.entrySet()) {
+            System.out.println("Field name: " + entry.getKey() + " appears " + entry.getValue() + " times.");
+        }
+    }
 }
