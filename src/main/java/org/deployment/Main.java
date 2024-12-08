@@ -1,12 +1,14 @@
 package org.deployment;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Iterator;
+import java.util.Map;
 
 public class Main {
 
@@ -20,14 +22,22 @@ public class Main {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode rootNode = objectMapper.readTree(jsonFile);
 
-        // Search for specific field names (id, containerId, _id)
-        searchForFieldNames(rootNode, "", new String[]{"id", "containerId", "_id"});
+        // Step 1: Extract UUIDs and their relations
+        extractFieldRelations(rootNode, "", new String[]{"id", "containerId", "_id"});
 
-        // Print grouped values with their counts
-        printGroupedFieldValues();
+        // Print extracted relations
+        printFieldRelations();
+
+        // Step 2: Update UUIDs using extracted relations
+        updateJsonWithTransformedUUIDs(rootNode);
+
+        // Write the updated JSON back to the file
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(jsonFile, rootNode);
+
+        System.out.println("Updated realm-export.json with transformed UUIDs.");
     }
 
-    private static void searchForFieldNames(JsonNode node, String currentPath, String[] fieldNamesToFind) {
+    private static void extractFieldRelations(JsonNode node, String currentPath, String[] fieldNamesToFind) {
         if (node.isObject()) {
             Iterator<String> fieldNames = node.fieldNames();
             while (fieldNames.hasNext()) {
@@ -36,8 +46,7 @@ public class Main {
 
                 // Check if the current field name is one of the fields we're looking for
                 for (String fieldNameToFind : fieldNamesToFind) {
-                    if (fieldName.equals(fieldNameToFind)) {
-                        // If found, process the value
+                    if (fieldName.equals(fieldNameToFind) && childNode.isTextual()) {
                         String value = childNode.asText();
                         fieldValues.putIfAbsent(value, new FieldInfo(value));
                         fieldValues.get(value).addPath(currentPath + "." + fieldName);
@@ -45,23 +54,59 @@ public class Main {
                 }
 
                 // Continue to traverse the child node
-                searchForFieldNames(childNode, currentPath.isEmpty() ? fieldName : currentPath + "." + fieldName, fieldNamesToFind);
+                extractFieldRelations(childNode, currentPath.isEmpty() ? fieldName : currentPath + "." + fieldName, fieldNamesToFind);
             }
         } else if (node.isArray()) {
             for (int i = 0; i < node.size(); i++) {
-                searchForFieldNames(node.get(i), currentPath + "[" + i + "]", fieldNamesToFind);
+                extractFieldRelations(node.get(i), currentPath + "[" + i + "]", fieldNamesToFind);
             }
         }
     }
 
-    private static void printGroupedFieldValues() {
-        System.out.println("\nGrouped field values:");
+    private static void printFieldRelations() {
+        System.out.println("\nExtracted field relations:");
         for (Map.Entry<String, FieldInfo> entry : fieldValues.entrySet()) {
             FieldInfo fieldInfo = entry.getValue();
             System.out.println("Value: " + fieldInfo.getValue());
             System.out.println("Paths: " + fieldInfo.getPaths());
             System.out.println("Occurrences: " + fieldInfo.getCount() + "\n");
         }
+    }
+
+    private static void updateJsonWithTransformedUUIDs(JsonNode node) {
+        if (node.isObject()) {
+            Iterator<String> fieldNames = node.fieldNames();
+            while (fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                JsonNode childNode = node.get(fieldName);
+
+                if (childNode.isTextual()) {
+                    String originalValue = childNode.asText();
+                    if (fieldValues.containsKey(originalValue)) {
+                        String transformedValue = transformUUID(originalValue);
+                        ((ObjectNode) node).put(fieldName, transformedValue);
+                        System.out.println("Updated field: " + fieldName + ", Original: " + originalValue + ", Transformed: " + transformedValue);
+                    }
+                }
+
+                // Continue traversing the child node
+                updateJsonWithTransformedUUIDs(childNode);
+            }
+        } else if (node.isArray()) {
+            for (JsonNode arrayElement : node) {
+                updateJsonWithTransformedUUIDs(arrayElement);
+            }
+        }
+    }
+
+    private static String transformUUID(String original) {
+        // Check if the UUID is at least 6 characters long
+        if (original.length() >= 6) {
+            // Remove the last 6 characters and append "241224"
+            return original.substring(0, original.length() - 6) + "241224";
+        }
+        // Return the original if it's too short to transform
+        return original;
     }
 
     // Helper class to hold value, paths, and count
