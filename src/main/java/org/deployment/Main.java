@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.UUID;
 
 public class Main {
 
@@ -35,8 +36,15 @@ public class Main {
         File updatedFile = new File("realm-export-updated.json");
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(updatedFile, rootNode);
 
-
         System.out.println("Updated realm-export.json with transformed UUIDs.");
+
+        // Step 3: Update fields named "secret" with generated UUIDs
+        updateSecretFields(rootNode);
+
+        // Save the updated JSON with "secret" field changes
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(updatedFile, rootNode);
+
+        System.out.println("Updated realm-export.json with new 'secret' values saved to: " + updatedFile.getAbsolutePath());
     }
 
     private static void extractFieldRelations(JsonNode node, String currentPath, String[] fieldNamesToFind) {
@@ -97,6 +105,31 @@ public class Main {
         } else if (node.isArray()) {
             for (JsonNode arrayElement : node) {
                 updateJsonWithTransformedUUIDs(arrayElement);
+            }
+        }
+    }
+
+    private static void updateSecretFields(JsonNode node) {
+        if (node.isObject()) {
+            Iterator<String> fieldNames = node.fieldNames();
+            while (fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                JsonNode childNode = node.get(fieldName);
+
+                // Check if the field name is "secret"
+                if ("secret".equals(fieldName) && childNode.isTextual()) {
+                    // Generate a new UUID and replace the value
+                    String newUUID = UUID.randomUUID().toString();
+                    ((ObjectNode) node).put(fieldName, newUUID);
+                    System.out.println("Updated 'secret' field: " + fieldName + ", New Value: " + newUUID);
+                }
+
+                // Continue traversing the child node
+                updateSecretFields(childNode);
+            }
+        } else if (node.isArray()) {
+            for (JsonNode arrayElement : node) {
+                updateSecretFields(arrayElement);
             }
         }
     }
