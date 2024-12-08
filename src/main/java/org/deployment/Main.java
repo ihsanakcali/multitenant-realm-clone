@@ -1,5 +1,4 @@
 package org.deployment;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -11,7 +10,7 @@ import java.util.Iterator;
 
 public class Main {
 
-    private static Map<String, Integer> fieldCount = new HashMap<>();
+    private static Map<String, FieldInfo> fieldValues = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         // Path to your JSON file
@@ -21,11 +20,11 @@ public class Main {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode rootNode = objectMapper.readTree(jsonFile);
 
-        // Search for specific field names (id, containerId)
+        // Search for specific field names (id, containerId, _id)
         searchForFieldNames(rootNode, "", new String[]{"id", "containerId", "_id"});
 
-        // Print counts for field names
-        printFieldCounts();
+        // Print grouped values with their counts
+        printGroupedFieldValues();
     }
 
     private static void searchForFieldNames(JsonNode node, String currentPath, String[] fieldNamesToFind) {
@@ -38,9 +37,10 @@ public class Main {
                 // Check if the current field name is one of the fields we're looking for
                 for (String fieldNameToFind : fieldNamesToFind) {
                     if (fieldName.equals(fieldNameToFind)) {
-                        // If found, increment count and print the path
-                        fieldCount.put(fieldName, fieldCount.getOrDefault(fieldName, 0) + 1);
-                        System.out.println("Found field: " + fieldName + " at path: " + currentPath + "." + fieldName);
+                        // If found, process the value
+                        String value = childNode.asText();
+                        fieldValues.putIfAbsent(value, new FieldInfo(value));
+                        fieldValues.get(value).addPath(currentPath + "." + fieldName);
                     }
                 }
 
@@ -54,10 +54,39 @@ public class Main {
         }
     }
 
-    private static void printFieldCounts() {
-        System.out.println("\nField counts:");
-        for (Map.Entry<String, Integer> entry : fieldCount.entrySet()) {
-            System.out.println("Field name: " + entry.getKey() + " appears " + entry.getValue() + " times.");
+    private static void printGroupedFieldValues() {
+        System.out.println("\nGrouped field values:");
+        for (Map.Entry<String, FieldInfo> entry : fieldValues.entrySet()) {
+            FieldInfo fieldInfo = entry.getValue();
+            System.out.println("Value: " + fieldInfo.getValue());
+            System.out.println("Paths: " + fieldInfo.getPaths());
+            System.out.println("Occurrences: " + fieldInfo.getCount() + "\n");
+        }
+    }
+
+    // Helper class to hold value, paths, and count
+    private static class FieldInfo {
+        private final String value;
+        private final Map<String, Integer> paths = new HashMap<>();
+
+        public FieldInfo(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public int getCount() {
+            return paths.size();
+        }
+
+        public void addPath(String path) {
+            paths.put(path, paths.getOrDefault(path, 0) + 1);
+        }
+
+        public String getPaths() {
+            return String.join(", ", paths.keySet());
         }
     }
 }
