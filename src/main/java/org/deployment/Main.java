@@ -31,8 +31,10 @@ public class Main {
         // Step 2: Update UUIDs using extracted relations
         updateJsonWithTransformedUUIDs(rootNode);
 
-        // Write the updated JSON back to the file
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(jsonFile, rootNode);
+        // Save the updated JSON to a new file
+        File updatedFile = new File("realm-export-updated.json");
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(updatedFile, rootNode);
+
 
         System.out.println("Updated realm-export.json with transformed UUIDs.");
     }
