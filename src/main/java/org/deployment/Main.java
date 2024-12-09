@@ -135,12 +135,22 @@ public class Main {
     }
 
     private static String transformUUID(String original) {
-        // Check if the UUID is at least 6 characters long
+        // Check if the original string is longer than 36 characters
+        if (original.length() > 36) {
+            original = original.substring(0, 36); // Truncate to 36 characters
+        }
+
+        // If the string is at least 6 characters long, transform the UUID
         if (original.length() >= 6) {
             // Remove the last 6 characters and append "241224"
             return original.substring(0, original.length() - 6) + "241224";
         }
-        // Return the original if it's too short to transform
+
+        else if(original.length() < 6) {
+            throw new IllegalArgumentException("UUID is too short to transform. It must be at least 6 characters long.");
+        }
+
+        // Return the original string if it's too short to transform
         return original;
     }
 
